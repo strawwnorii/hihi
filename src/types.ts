@@ -40,7 +40,9 @@ export interface BirthdayCake {
   recipientName: string;
   cakeTitle: string;
   messages: CandleMessage[];
-  finalMessage: FinalMessage;
+  // null until fetchFinalMessage() has actually been called — kept out of
+  // the initial fetch so it never reaches the browser before it's unlocked.
+  finalMessage: FinalMessage | null;
 }
 
 export const DEFAULT_CANDLE_DESIGN: CandleDesign = {

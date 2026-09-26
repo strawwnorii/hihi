@@ -5,9 +5,10 @@ import { MessageModal } from '../components/MessageModal';
 import { ProgressBar } from '../components/ProgressBar';
 import { SoundToggle } from '../components/SoundToggle';
 import { FinalRevealOverlay } from '../components/FinalRevealOverlay';
-import { fetchCake, markMessageRead } from '../lib/cakeStore';
+import { fetchCake, fetchFinalMessage, fetchMessageText, markMessageRead } from '../lib/cakeStore';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useSound } from '../hooks/useSound';
+import { DEFAULT_CANDLE_DESIGN } from '../types';
 import type { BirthdayCake } from '../types';
 
 type RevealPhase = 'celebrating' | 'announcing' | null;
@@ -43,6 +44,16 @@ export function CakePage() {
   const allRead = useMemo(() => !!cake && cake.messages.length > 0 && cake.messages.every((m) => m.read), [cake]);
   const readCount = cake ? cake.messages.filter((m) => m.read).length : 0;
 
+  // The final message's text isn't fetched until every other candle is
+  // read — this is the moment it's actually allowed to reach the browser.
+  useEffect(() => {
+    if (allRead && cake && !cake.finalMessage) {
+      fetchFinalMessage(slug).then((fm) => {
+        if (fm) setCake((prev) => (prev ? { ...prev, finalMessage: fm } : prev));
+      });
+    }
+  }, [allRead, cake, slug]);
+
   useEffect(() => {
     if (allRead && !finalUnlocked) {
       const t1 = setTimeout(() => setRevealPhase('celebrating'), reducedMotion ? 100 : 500);
@@ -77,10 +88,25 @@ export function CakePage() {
 
   const selectedMessage =
     selectedId === 'final'
-      ? { id: 'final', sender: cake.finalMessage.sender, message: cake.finalMessage.message, candle: cake.finalMessage.candle, read: finalRead, createdAt: '' }
+      ? cake.finalMessage
+        ? { id: 'final', sender: cake.finalMessage.sender, message: cake.finalMessage.message, candle: cake.finalMessage.candle, read: finalRead, createdAt: '' }
+        : null
       : cake.messages.find((m) => m.id === selectedId) ?? null;
 
-  function handleOpen(id: string) {
+  const currentCake = cake;
+
+  async function handleOpen(id: string) {
+    if (id !== 'final') {
+      const target = currentCake.messages.find((m) => m.id === id);
+      // Text for this candle hasn't been requested yet — fetch it now,
+      // right as it's opened, rather than having had it all along.
+      if (target && !target.message) {
+        const text = await fetchMessageText(slug, id);
+        setCake((prev) =>
+          prev ? { ...prev, messages: prev.messages.map((m) => (m.id === id ? { ...m, message: text ?? '' } : m)) } : prev
+        );
+      }
+    }
     setSelectedId(id);
     sound.play('select');
   }
@@ -119,8 +145,8 @@ export function CakePage() {
         <div className="my-10 flex-1 sm:my-14">
           <Cake
             messages={cake.messages}
-            finalMessage={cake.finalMessage}
-            finalUnlocked={finalUnlocked}
+            finalMessage={cake.finalMessage ?? { sender: '', message: '', candle: DEFAULT_CANDLE_DESIGN }}
+            finalUnlocked={finalUnlocked && !!cake.finalMessage}
             finalRead={finalRead}
             selectedId={selectedId}
             onOpen={handleOpen}

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { CandleCreatorForm } from '../components/CandleCreatorForm';
 import { Candle } from '../components/Candle';
 import { validateSubmission, sanitizeText, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH } from '../lib/sanitize';
@@ -51,11 +51,9 @@ export function SubmitPage() {
         </div>
         <h1 className="font-display text-2xl italic text-ink">Your candle is lit.</h1>
         <p className="max-w-xs text-sm text-muted">
-          It'll appear on the cake for them to find. Thank you for taking the time.
+          It'll appear on the cake for them to find. Thank you for taking the time — and to keep it a surprise,
+          this page won't link you to the cake itself.
         </p>
-        <Link to={`/cake/${slug}`} className="mt-2 text-sm text-gold-light underline underline-offset-4">
-          View the cake
-        </Link>
       </div>
     );
   }
