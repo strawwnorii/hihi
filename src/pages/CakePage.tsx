@@ -1,11 +1,18 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Cake } from '../components/Cake';
 import { MessageModal } from '../components/MessageModal';
 import { ProgressBar } from '../components/ProgressBar';
 import { SoundToggle } from '../components/SoundToggle';
 import { FinalRevealOverlay } from '../components/FinalRevealOverlay';
-import { fetchCake, fetchFinalMessage, fetchMessageText, markMessageRead } from '../lib/cakeStore';
+import {
+  fetchCake,
+  fetchCakeSummary,
+  fetchFinalMessage,
+  fetchMessageText,
+  markMessageRead,
+  verifyCakePassword,
+} from '../lib/cakeStore';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useSound } from '../hooks/useSound';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
@@ -13,8 +20,18 @@ import type { BirthdayCake } from '../types';
 
 type RevealPhase = 'celebrating' | 'announcing' | null;
 
+function unlockKey(slug: string) {
+  return `cake_unlocked_${slug}`;
+}
+
 export function CakePage() {
   const { slug = '' } = useParams();
+  const [unlocked, setUnlocked] = useState(() => localStorage.getItem(unlockKey(slug)) === '1');
+  const [summary, setSummary] = useState<{ recipientName: string; cakeTitle: string } | null | undefined>(undefined);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [checkingPassword, setCheckingPassword] = useState(false);
+
   const [cake, setCake] = useState<BirthdayCake | null | undefined>(undefined);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [finalRead, setFinalRead] = useState(false);
@@ -24,7 +41,21 @@ export function CakePage() {
   const sound = useSound();
   const hasCheckedInitialState = useRef(false);
 
+  // Before we know whether this visitor has the password, only fetch
+  // enough to show a title on the gate screen — never the messages.
   useEffect(() => {
+    if (unlocked) return;
+    let active = true;
+    fetchCakeSummary(slug).then((s) => {
+      if (active) setSummary(s);
+    });
+    return () => {
+      active = false;
+    };
+  }, [slug, unlocked]);
+
+  useEffect(() => {
+    if (!unlocked) return;
     let active = true;
     fetchCake(slug).then((c) => {
       if (!active) return;
@@ -39,7 +70,7 @@ export function CakePage() {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, unlocked]);
 
   const allRead = useMemo(() => !!cake && cake.messages.length > 0 && cake.messages.every((m) => m.read), [cake]);
   const readCount = cake ? cake.messages.filter((m) => m.read).length : 0;
@@ -71,6 +102,72 @@ export function CakePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allRead, finalUnlocked, reducedMotion]);
+
+  async function handlePasswordSubmit(e: FormEvent) {
+    e.preventDefault();
+    setCheckingPassword(true);
+    setPasswordError(null);
+    const ok = await verifyCakePassword(slug, passwordInput);
+    setCheckingPassword(false);
+    if (!ok) {
+      setPasswordError("That's not it — try again.");
+      return;
+    }
+    localStorage.setItem(unlockKey(slug), '1');
+    setUnlocked(true);
+  }
+
+  if (!unlocked) {
+    if (summary === undefined) {
+      return <CenteredNote>Loading&hellip;</CenteredNote>;
+    }
+    if (summary === null) {
+      return (
+        <CenteredNote>
+          This cake doesn&rsquo;t exist yet.{' '}
+          <Link to="/" className="underline decoration-gold/50 underline-offset-4 hover:text-gold-light">
+            Go home
+          </Link>
+        </CenteredNote>
+      );
+    }
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-espresso px-6 text-center">
+        <p className="text-xs tracking-[0.15em] text-muted">{summary.cakeTitle}</p>
+        <h1 className="max-w-md font-display text-3xl italic text-ink sm:text-4xl">
+          A cake for {summary.recipientName}
+        </h1>
+        <Link
+          to={`/submit/${slug}`}
+          className="rounded-sm bg-flame/90 px-5 py-2.5 text-sm font-medium text-espresso-dark hover:bg-flame"
+        >
+          Send a message
+        </Link>
+
+        <form onSubmit={handlePasswordSubmit} className="mt-4 flex w-full max-w-xs flex-col gap-3">
+          <label className="flex flex-col gap-2 text-left">
+            <span className="text-xs tracking-wide text-muted">
+              {summary.recipientName}? Enter the password to read your messages.
+            </span>
+            <input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              className="rounded-sm border border-white/15 bg-espresso-light px-3 py-2.5 text-ink placeholder:text-muted/60"
+            />
+          </label>
+          {passwordError && <p className="text-sm text-flame">{passwordError}</p>}
+          <button
+            type="submit"
+            disabled={checkingPassword}
+            className="rounded-sm border border-white/15 px-4 py-2.5 text-sm hover:border-white/30 disabled:opacity-50"
+          >
+            {checkingPassword ? 'Checking…' : 'View messages'}
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   if (cake === undefined) {
     return <CenteredNote>Lighting the candles&hellip;</CenteredNote>;

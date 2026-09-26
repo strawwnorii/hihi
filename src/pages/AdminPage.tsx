@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { createCake, deleteMessage, listMyCakes, sendAdminMagicLink } from '../lib/adminStore';
+import { createCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword } from '../lib/adminStore';
 import { fetchCake } from '../lib/cakeStore';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
@@ -187,6 +187,7 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
   const [cakeTitle, setCakeTitle] = useState('');
   const [finalSender, setFinalSender] = useState('');
   const [finalMessage, setFinalMessage] = useState('');
+  const [viewPassword, setViewPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -199,6 +200,10 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
           setError('Fill in the link, recipient name, and your final message.');
           return;
         }
+        if (!viewPassword) {
+          setError('Set a view password so only the recipient can read the messages.');
+          return;
+        }
         const res = await createCake({
           slug: cleanSlug,
           recipientName,
@@ -209,6 +214,11 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
         });
         if (!res.ok) {
           setError(res.error ?? 'Could not create the cake.');
+          return;
+        }
+        const pwRes = await setCakePassword(cleanSlug, viewPassword);
+        if (!pwRes.ok) {
+          setError(`Cake created, but the password could not be set: ${pwRes.error ?? 'unknown error'}`);
           return;
         }
         onCreated();
@@ -225,6 +235,18 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setFinalMessage(e.target.value)}
           rows={4}
           className="resize-none rounded-sm border border-white/15 bg-espresso px-3 py-2.5 text-ink"
+        />
+      </label>
+      <label className="flex flex-col gap-2">
+        <span className="text-xs tracking-wide text-muted">
+          View password <span className="text-muted/70">(only the recipient should get this)</span>
+        </span>
+        <input
+          type="text"
+          value={viewPassword}
+          onChange={(e) => setViewPassword(e.target.value)}
+          placeholder="e.g. a word only they'd know"
+          className="rounded-sm border border-white/15 bg-espresso px-3 py-2.5 text-ink placeholder:text-muted/60"
         />
       </label>
       {error && <p className="text-sm text-flame">{error}</p>}
@@ -263,11 +285,29 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
   const shareUrl = `${window.location.origin}/submit/${cake.slug}`;
   const viewUrl = `${window.location.origin}/cake/${cake.slug}`;
   const [copied, setCopied] = useState<'share' | 'view' | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [pwStatus, setPwStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [pwError, setPwError] = useState<string | null>(null);
 
   function copy(url: string, which: 'share' | 'view') {
     navigator.clipboard.writeText(url);
     setCopied(which);
     setTimeout(() => setCopied(null), 1500);
+  }
+
+  async function savePassword(e: FormEvent) {
+    e.preventDefault();
+    setPwStatus('saving');
+    setPwError(null);
+    const res = await setCakePassword(cake.slug, newPassword);
+    if (!res.ok) {
+      setPwStatus('error');
+      setPwError(res.error ?? 'Could not save the password.');
+      return;
+    }
+    setPwStatus('saved');
+    setNewPassword('');
+    setTimeout(() => setPwStatus('idle'), 1500);
   }
 
   return (
@@ -279,6 +319,44 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
           Preview cake
         </Link>
       </div>
+
+      <form onSubmit={savePassword} className="mt-6 flex flex-wrap items-end gap-3 rounded-sm border border-white/10 bg-espresso-light p-4">
+        <label className="flex flex-1 flex-col gap-2">
+          <span className="text-xs tracking-wide text-muted">
+            View password <span className="text-muted/70">(recipient needs this to open the cake link)</span>
+          </span>
+          <input
+            type="text"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="Set a new password…"
+            className="rounded-sm border border-white/15 bg-espresso px-3 py-2.5 text-ink placeholder:text-muted/60"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={pwStatus === 'saving'}
+          className="rounded-sm border border-white/15 px-3 py-2.5 text-xs hover:border-white/30 disabled:opacity-50"
+        >
+          {pwStatus === 'saving' ? 'Saving…' : pwStatus === 'saved' ? 'Saved!' : 'Save password'}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            setPwStatus('saving');
+            setPwError(null);
+            const res = await setCakePassword(cake.slug, '');
+            setPwStatus(res.ok ? 'saved' : 'error');
+            if (!res.ok) setPwError(res.error ?? 'Could not clear the password.');
+            setNewPassword('');
+            setTimeout(() => setPwStatus('idle'), 1500);
+          }}
+          className="text-xs text-muted underline underline-offset-4 hover:text-ink"
+        >
+          Remove password
+        </button>
+        {pwError && <p className="w-full text-sm text-flame">{pwError}</p>}
+      </form>
 
       <p className="mt-6 text-xs tracking-wide text-muted">
         {cake.messages.filter((m) => m.read).length} of {cake.messages.length} read

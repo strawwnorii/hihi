@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { MOCK_CAKES } from '../data/mockCakes';
+import { MOCK_CAKES, MOCK_PASSWORDS } from '../data/mockCakes';
 import type { BirthdayCake, CandleDesign } from '../types';
 
 export interface NewCakeInput {
@@ -78,5 +78,23 @@ export async function sendAdminMagicLink(email: string): Promise<{ ok: boolean; 
   if (!isSupabaseConfigured) return { ok: false, error: 'Connect Supabase to enable admin login.' };
   const { error } = await supabase!.auth.signInWithOtp({ email });
   if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Sets, changes, or (with an empty string) clears the password required to
+// view a cake's messages. Only works for a cake you own — enforced by
+// set_cake_password() in schema.sql via auth.uid().
+export async function setCakePassword(slug: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    if (password === '') {
+      delete MOCK_PASSWORDS[slug];
+    } else {
+      MOCK_PASSWORDS[slug] = password;
+    }
+    return { ok: true };
+  }
+  const { data, error } = await supabase!.rpc('set_cake_password', { p_slug: slug, p_password: password });
+  if (error) return { ok: false, error: error.message };
+  if (data !== true) return { ok: false, error: 'Could not find that cake under your account.' };
   return { ok: true };
 }

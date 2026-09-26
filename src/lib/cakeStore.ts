@@ -1,5 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabase';
-import { getMockCake } from '../data/mockCakes';
+import { getMockCake, MOCK_PASSWORDS } from '../data/mockCakes';
 import { getDeviceId, getLocalReadIds, markLocalRead } from './deviceReadState';
 import type { BirthdayCake, CandleDesign } from '../types';
 
@@ -7,6 +7,39 @@ import type { BirthdayCake, CandleDesign } from '../types';
 // as the shared in-memory database for the current tab. adminStore.ts
 // creates/deletes against that same object, so everything stays consistent
 // without a second copy to keep in sync.
+
+// Lightweight fetch for the pre-password gate screen: just enough to show
+// a title, never the messages or final message. Used before we know
+// whether the visitor actually has the password.
+export async function fetchCakeSummary(
+  slug: string
+): Promise<{ recipientName: string; cakeTitle: string } | null> {
+  if (!isSupabaseConfigured) {
+    const cake = getMockCake(slug);
+    return cake ? { recipientName: cake.recipientName, cakeTitle: cake.cakeTitle } : null;
+  }
+  const { data, error } = await supabase!
+    .from('cakes')
+    .select('recipient_name, cake_title')
+    .eq('slug', slug)
+    .single();
+  if (error || !data) return null;
+  return { recipientName: data.recipient_name as string, cakeTitle: data.cake_title as string };
+}
+
+// Checks a password attempt against the cake's stored hash. In Supabase
+// mode this runs entirely server-side (see verify_cake_password() in
+// schema.sql) — the hash itself never reaches the browser.
+export async function verifyCakePassword(slug: string, password: string): Promise<boolean> {
+  if (!isSupabaseConfigured) {
+    const stored = MOCK_PASSWORDS[slug];
+    if (!stored) return true; // no password set on this mock cake — open
+    return stored === password;
+  }
+  const { data, error } = await supabase!.rpc('verify_cake_password', { p_slug: slug, p_password: password });
+  if (error) return false;
+  return data === true;
+}
 
 export async function fetchCake(slug: string): Promise<BirthdayCake | null> {
   if (!isSupabaseConfigured) {

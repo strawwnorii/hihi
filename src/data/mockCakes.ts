@@ -100,3 +100,8 @@ export const MOCK_CAKES: Record<string, BirthdayCake> = {
 export function getMockCake(slug: string): BirthdayCake | undefined {
   return MOCK_CAKES[slug];
 }
+
+// Mock-mode stand-in for the real `view_password_hash` column + RPCs. Kept
+// separate from BirthdayCake itself so the password never rides along with
+// the rest of the cake data through fetchCake().
+export const MOCK_PASSWORDS: Record<string, string> = {};

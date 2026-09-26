@@ -80,3 +80,52 @@ create policy "anyone can update their own device's read state" on read_state
 
 create policy "read state is publicly readable" on read_state
   for select using (true);
+
+-- VIEW PASSWORD (optional, set per cake in /admin)
+-- Lets the creator require a password before anyone with the /cake/<slug>
+-- link can actually see the candle messages. The password is hashed and
+-- checked entirely on the server via the two functions below — it never
+-- travels to or through the browser in plain form, and the hash itself is
+-- never selected by the app's normal queries either.
+alter table cakes add column if not exists view_password_hash text;
+
+-- Only the cake's owner (signed in to /admin) can set/change/clear the
+-- password. Passing an empty string clears it (cake becomes open again).
+create or replace function set_cake_password(p_slug text, p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update cakes
+  set view_password_hash = case when p_password = '' then null else crypt(p_password, gen_salt('bf')) end
+  where slug = p_slug and owner_id = auth.uid();
+  return found;
+end;
+$$;
+revoke all on function set_cake_password(text, text) from public;
+grant execute on function set_cake_password(text, text) to authenticated;
+
+-- Anyone can call this (no login needed, same trust model as the link
+-- itself) but it only ever returns true/false — never the password or the
+-- stored hash. If no password has been set for a cake, it returns true so
+-- older/no-password cakes keep working exactly as before.
+create or replace function verify_cake_password(p_slug text, p_password text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored text;
+begin
+  select view_password_hash into stored from cakes where slug = p_slug;
+  if stored is null then
+    return true;
+  end if;
+  return stored = crypt(p_password, stored);
+end;
+$$;
+revoke all on function verify_cake_password(text, text) from public;
+grant execute on function verify_cake_password(text, text) to anon, authenticated;
