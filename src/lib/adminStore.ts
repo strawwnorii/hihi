@@ -54,6 +54,21 @@ export async function deleteMessage(messageId: string): Promise<void> {
   await supabase!.from('messages').delete().eq('id', messageId);
 }
 
+// Deletes a cake entirely, along with every message and read-state row on
+// it (both cascade via "on delete cascade" in schema.sql). RLS already
+// restricts this to the cake's own owner, so no extra owner check is
+// needed here beyond passing the slug.
+export async function deleteCake(slug: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    delete MOCK_CAKES[slug];
+    delete MOCK_PASSWORDS[slug];
+    return { ok: true };
+  }
+  const { error } = await supabase!.from('cakes').delete().eq('slug', slug);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 export async function listMyCakes(): Promise<BirthdayCake[]> {
   if (!isSupabaseConfigured) {
     return Object.values(MOCK_CAKES);

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { createCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword } from '../lib/adminStore';
+import { createCake, deleteCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword } from '../lib/adminStore';
 import { fetchCake } from '../lib/cakeStore';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
@@ -116,6 +116,7 @@ function AdminDashboard() {
   const [cakes, setCakes] = useState<BirthdayCake[]>([]);
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
   const [detail, setDetail] = useState<BirthdayCake | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [creating, setCreating] = useState(false);
 
   async function refresh() {
@@ -128,9 +129,31 @@ function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!selectedSlug) return;
-    fetchCake(selectedSlug).then(setDetail);
+    if (!selectedSlug) {
+      setDetail(null);
+      return;
+    }
+    let active = true;
+    setLoadingDetail(true);
+    fetchCake(selectedSlug).then((d) => {
+      if (!active) return;
+      setDetail(d);
+      setLoadingDetail(false);
+    });
+    return () => {
+      active = false;
+    };
   }, [selectedSlug]);
+
+  async function handleDeleteCake(slug: string) {
+    const res = await deleteCake(slug);
+    if (!res.ok) {
+      alert(res.error ?? 'Could not delete that cake.');
+      return;
+    }
+    setSelectedSlug(null);
+    await refresh();
+  }
 
   return (
     <div className="min-h-screen bg-espresso px-5 py-12 text-ink sm:py-16">
@@ -157,24 +180,29 @@ function AdminDashboard() {
 
         <div className="mt-8 flex flex-col gap-3">
           {cakes.map((c) => (
-            <button
+            <div
               key={c.slug}
-              onClick={() => setSelectedSlug(c.slug)}
               className={[
-                'flex items-center justify-between rounded-sm border px-4 py-3 text-left transition-colors',
+                'flex items-center justify-between rounded-sm border px-4 py-3 transition-colors',
                 selectedSlug === c.slug ? 'border-gold/50 bg-espresso-light' : 'border-white/10 hover:border-white/25',
               ].join(' ')}
             >
-              <span>
+              <button type="button" onClick={() => setSelectedSlug(c.slug)} className="flex-1 text-left">
                 <span className="block font-medium">{c.recipientName}</span>
                 <span className="block text-xs text-muted">/cake/{c.slug}</span>
+              </button>
+              <span className="mr-3 text-xs text-muted">
+                {selectedSlug === c.slug && loadingDetail ? 'Loading…' : 'manage →'}
               </span>
-              <span className="text-xs text-muted">manage →</span>
-            </button>
+              <DeleteCakeButton slug={c.slug} onConfirmed={() => handleDeleteCake(c.slug)} />
+            </div>
           ))}
           {cakes.length === 0 && !creating && <p className="text-sm text-muted">No cakes yet. Create one above.</p>}
         </div>
 
+        {selectedSlug && loadingDetail && !detail && (
+          <p className="mt-10 text-sm text-muted">Loading cake…</p>
+        )}
         {detail && selectedSlug && <CakeDetail cake={detail} onChanged={() => fetchCake(selectedSlug).then(setDetail)} />}
       </div>
     </div>
@@ -389,6 +417,57 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
         )}
       </ul>
     </div>
+  );
+}
+
+function DeleteCakeButton({ slug, onConfirmed }: { slug: string; onConfirmed: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  if (deleting) {
+    return <span className="shrink-0 text-xs text-muted">Deleting…</span>;
+  }
+
+  if (confirming) {
+    return (
+      <span className="flex shrink-0 items-center gap-2">
+        <span className="text-xs text-muted">Delete /{slug}?</span>
+        <button
+          type="button"
+          onClick={async (e) => {
+            e.stopPropagation();
+            setDeleting(true);
+            await onConfirmed();
+          }}
+          className="text-xs font-medium text-flame hover:underline"
+        >
+          Yes, delete
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setConfirming(false);
+          }}
+          className="text-xs text-muted hover:text-ink"
+        >
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        setConfirming(true);
+      }}
+      className="shrink-0 text-xs text-muted hover:text-flame"
+    >
+      Delete
+    </button>
   );
 }
 
