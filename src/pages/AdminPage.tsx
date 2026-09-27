@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { createCake, deleteCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword } from '../lib/adminStore';
 import { fetchCake } from '../lib/cakeStore';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { CandleCreatorForm } from '../components/CandleCreatorForm';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
-import type { BirthdayCake } from '../types';
+import type { BirthdayCake, CandleDesign } from '../types';
 
 // Optional: restrict /admin to a single email address. Leave VITE_ADMIN_EMAIL
 // unset in .env.local to allow any email to sign up as a creator.
@@ -216,6 +217,7 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
   const [finalSender, setFinalSender] = useState('');
   const [finalMessage, setFinalMessage] = useState('');
   const [viewPassword, setViewPassword] = useState('');
+  const [candleDesign, setCandleDesign] = useState<CandleDesign>({ ...DEFAULT_CANDLE_DESIGN, flame: 'firework' });
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -238,7 +240,7 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
           cakeTitle: cakeTitle || `Happy Birthday, ${recipientName}`,
           finalSender: finalSender || 'You',
           finalMessage,
-          finalCandle: { ...DEFAULT_CANDLE_DESIGN, flame: 'sparkle' },
+          finalCandle: candleDesign,
         });
         if (!res.ok) {
           setError(res.error ?? 'Could not create the cake.');
@@ -277,6 +279,12 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
           className="rounded-sm border border-white/15 bg-espresso px-3 py-2.5 text-ink placeholder:text-muted/60"
         />
       </label>
+      <div className="flex flex-col gap-2">
+        <span className="text-xs tracking-wide text-muted">
+          Your final candle <span className="text-muted/70">(the last one they'll light — make it yours)</span>
+        </span>
+        <CandleCreatorForm design={candleDesign} onChange={setCandleDesign} exclusiveFlames exclusiveColors />
+      </div>
       {error && <p className="text-sm text-flame">{error}</p>}
       <button type="submit" className="self-start rounded-sm bg-flame/90 px-4 py-2 text-sm font-medium text-espresso-dark hover:bg-flame">
         Create cake

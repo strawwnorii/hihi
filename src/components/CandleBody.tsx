@@ -58,6 +58,14 @@ export function CandleBody({ shape, color, pattern, width, height }: CandleBodyP
             <circle cx="3.5" cy="3.5" r="1.3" fill="black" opacity="0.16" />
           </pattern>
         )}
+        {pattern === 'glitter' && (
+          <pattern id={patternId} width="8" height="8" patternUnits="userSpaceOnUse">
+            <rect width="8" height="8" fill={base} />
+            <circle cx="1.5" cy="2" r="0.7" fill="#FFF3D6" opacity="0.9" />
+            <circle cx="5.5" cy="5.5" r="0.5" fill="#FFF3D6" opacity="0.7" />
+            <circle cx="6.5" cy="1.5" r="0.4" fill="#FFF3D6" opacity="0.8" />
+          </pattern>
+        )}
       </defs>
       <path d={d} fill={pattern === 'plain' ? base : `url(#${patternId})`} />
       <path d={d} fill={`url(#shade-${uid})`} />

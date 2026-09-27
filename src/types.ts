@@ -1,7 +1,10 @@
 export type CandleShape = 'classic' | 'twisted' | 'heart' | 'star' | 'slim' | 'chunky';
-export type CandleColorName = 'white' | 'cream' | 'blue' | 'pink' | 'yellow' | 'green' | 'purple';
-export type CandlePattern = 'plain' | 'stripes' | 'dots';
-export type FlameStyle = 'normal' | 'small' | 'sparkle';
+// 'gold' and 'black' are exclusive — reserved for the admin's final candle,
+// never offered on the public sender-facing form.
+export type CandleColorName = 'white' | 'cream' | 'blue' | 'pink' | 'yellow' | 'green' | 'purple' | 'red' | 'teal' | 'gold' | 'black';
+export type CandlePattern = 'plain' | 'stripes' | 'dots' | 'glitter';
+// 'firework', 'rainbow' and 'confetti' are exclusive — same reasoning as above.
+export type FlameStyle = 'normal' | 'small' | 'sparkle' | 'steady' | 'firework' | 'rainbow' | 'confetti';
 
 export const CANDLE_COLORS: Record<CandleColorName, string> = {
   white: '#F7F4EE',
@@ -11,6 +14,10 @@ export const CANDLE_COLORS: Record<CandleColorName, string> = {
   yellow: '#E8C468',
   green: '#8CA888',
   purple: '#A48CBF',
+  red: '#C4574F',
+  teal: '#3E9E96',
+  gold: '#D4AF37',
+  black: '#2A2724',
 };
 
 export interface CandleDesign {
@@ -19,6 +26,7 @@ export interface CandleDesign {
   pattern: CandlePattern;
   flame: FlameStyle;
 }
+
 
 export interface CandleMessage {
   id: string;

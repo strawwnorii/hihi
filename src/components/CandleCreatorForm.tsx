@@ -7,6 +7,12 @@ import { CANDLE_COLORS } from '../types';
 interface CandleCreatorFormProps {
   design: CandleDesign;
   onChange: (design: CandleDesign) => void;
+  // When true, shows the exclusive flame effects (Firework, Rainbow,
+  // Confetti). Left off the sender-facing form (SubmitPage) so these stay
+  // a unique, owner-only touch reserved for the final candle.
+  exclusiveFlames?: boolean;
+  // Same idea, for the two richer colors (Gold, Black).
+  exclusiveColors?: boolean;
 }
 
 const SHAPES: { value: CandleShape; label: string }[] = [
@@ -18,24 +24,36 @@ const SHAPES: { value: CandleShape; label: string }[] = [
   { value: 'chunky', label: 'Chunky' },
 ];
 
-const COLORS: CandleColorName[] = ['white', 'cream', 'blue', 'pink', 'yellow', 'green', 'purple'];
+const COLORS: CandleColorName[] = ['white', 'cream', 'blue', 'pink', 'yellow', 'green', 'purple', 'red', 'teal'];
+const EXCLUSIVE_COLORS: CandleColorName[] = ['gold', 'black'];
 
 const PATTERNS: { value: CandlePattern; label: string }[] = [
   { value: 'plain', label: 'Plain' },
   { value: 'stripes', label: 'Stripes' },
   { value: 'dots', label: 'Dots' },
+  { value: 'glitter', label: 'Glitter' },
 ];
 
 const FLAMES: { value: FlameStyle; label: string }[] = [
   { value: 'normal', label: 'Normal' },
   { value: 'small', label: 'Small' },
+  { value: 'steady', label: 'Steady' },
   { value: 'sparkle', label: 'Sparkle' },
 ];
 
-export function CandleCreatorForm({ design, onChange }: CandleCreatorFormProps) {
+const EXCLUSIVE_FLAMES: { value: FlameStyle; label: string }[] = [
+  { value: 'firework', label: '✨ Firework' },
+  { value: 'rainbow', label: '🌈 Rainbow' },
+  { value: 'confetti', label: '🎉 Confetti' },
+];
+
+export function CandleCreatorForm({ design, onChange, exclusiveFlames, exclusiveColors }: CandleCreatorFormProps) {
   function set<K extends keyof CandleDesign>(key: K, value: CandleDesign[K]) {
     onChange({ ...design, [key]: value });
   }
+
+  const flameOptions = exclusiveFlames ? [...FLAMES, ...EXCLUSIVE_FLAMES] : FLAMES;
+  const colorOptions = exclusiveColors ? [...COLORS, ...EXCLUSIVE_COLORS] : COLORS;
 
   return (
     <div className="grid gap-8 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-start">
@@ -60,7 +78,7 @@ export function CandleCreatorForm({ design, onChange }: CandleCreatorFormProps) 
 
         <Field label="Color">
           <div className="flex flex-wrap gap-2.5">
-            {COLORS.map((c) => (
+            {colorOptions.map((c) => (
               <button
                 key={c}
                 type="button"
@@ -89,7 +107,7 @@ export function CandleCreatorForm({ design, onChange }: CandleCreatorFormProps) 
 
         <Field label="Flame">
           <div className="flex flex-wrap gap-2">
-            {FLAMES.map((f) => (
+            {flameOptions.map((f) => (
               <Chip key={f.value} active={design.flame === f.value} onClick={() => set('flame', f.value)}>
                 {f.label}
               </Chip>
