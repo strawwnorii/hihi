@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { getMockCake, MOCK_PASSWORDS } from '../data/mockCakes';
-import { getDeviceId, getLocalReadIds, markLocalRead } from './deviceReadState';
+import { getDeviceId, getLocalReadIds, markLocalRead, clearLocalReadIds } from './deviceReadState';
 import type { BirthdayCake, CandleDesign } from '../types';
 
 // Mock mode has no server, so `MOCK_CAKES` (from data/mockCakes.ts) doubles
@@ -185,4 +185,21 @@ export async function markMessageRead(slug: string, messageId: string): Promise<
     { message_id: messageId, device_id: deviceId, read_at: new Date().toISOString() },
     { onConflict: 'message_id,device_id' }
   );
+}
+
+// Lets the recipient relight every candle and go through the messages
+// again from scratch. Only clears THIS device's read markers — it doesn't
+// touch the messages themselves, so nothing sent is ever lost.
+export async function resetReadState(slug: string, messageIds: string[]): Promise<void> {
+  clearLocalReadIds(slug);
+  if (!isSupabaseConfigured) {
+    const cake = getMockCake(slug);
+    if (cake) {
+      for (const m of cake.messages) m.read = false;
+    }
+    return;
+  }
+  if (messageIds.length === 0) return;
+  const deviceId = getDeviceId();
+  await supabase!.from('read_state').delete().eq('device_id', deviceId).in('message_id', messageIds);
 }

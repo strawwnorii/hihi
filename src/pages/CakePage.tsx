@@ -11,6 +11,7 @@ import {
   fetchFinalMessage,
   fetchMessageText,
   markMessageRead,
+  resetReadState,
   verifyCakePassword,
 } from '../lib/cakeStore';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
@@ -219,6 +220,21 @@ export function CakePage() {
     setSelectedId(null);
   }
 
+  // Relights every candle so the recipient can go through all the messages
+  // again from the start. This only clears read markers for THIS device —
+  // the messages themselves are never deleted or changed.
+  async function handleReadAgain() {
+    const ids = currentCake.messages.map((m) => m.id);
+    await resetReadState(slug, ids);
+    setFinalUnlocked(false);
+    setFinalRead(false);
+    setRevealPhase(null);
+    setSelectedId(null);
+    setCake((prev) =>
+      prev ? { ...prev, messages: prev.messages.map((m) => ({ ...m, read: false, message: '' })) } : prev
+    );
+  }
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-espresso">
       <Grain reducedMotion={reducedMotion} />
@@ -252,6 +268,16 @@ export function CakePage() {
         </div>
 
         <ProgressBar read={readCount} total={cake.messages.length} />
+
+        {finalUnlocked && finalRead && (
+          <button
+            type="button"
+            onClick={handleReadAgain}
+            className="mt-6 text-xs text-muted underline underline-offset-4 hover:text-ink"
+          >
+            Read again?
+          </button>
+        )}
       </div>
 
       <MessageModal

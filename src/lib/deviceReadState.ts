@@ -41,3 +41,7 @@ export function markLocalRead(slug: string, messageId: string) {
   ids.add(messageId);
   localStorage.setItem(readKey(slug), JSON.stringify(Array.from(ids)));
 }
+
+export function clearLocalReadIds(slug: string) {
+  localStorage.removeItem(readKey(slug));
+}
