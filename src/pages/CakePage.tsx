@@ -6,6 +6,7 @@ import { ProgressBar } from '../components/ProgressBar';
 import { SoundToggle } from '../components/SoundToggle';
 import { FinalRevealOverlay } from '../components/FinalRevealOverlay';
 import { CountdownLock } from '../components/CountdownLock';
+import { fetchCakeForAdmin } from '../lib/cakeStore';
 import {
   fetchCake,
   fetchCakeSummary,
@@ -37,9 +38,11 @@ function candleTeaser(count: number): string {
   return `${count} candles are waiting for you.`;
 }
 
-export function CakePage() {
+// `preview` is the admin's "see what she'll see" mode: skips the password and
+// countdown, starts with every candle lit, and never saves read progress.
+export function CakePage({ preview = false }: { preview?: boolean } = {}) {
   const { slug = '' } = useParams();
-  const [unlocked, setUnlocked] = useState(() => localStorage.getItem(unlockKey(slug)) === '1');
+  const [unlocked, setUnlocked] = useState(() => preview || localStorage.getItem(unlockKey(slug)) === '1');
   const [summary, setSummary] = useState<CakeSummary | null | undefined>(undefined);
   const [, setClockTick] = useState(0); // forces a re-render when a countdown ends
   const [passwordInput, setPasswordInput] = useState('');
@@ -74,7 +77,12 @@ export function CakePage() {
   useEffect(() => {
     if (!unlocked) return;
     let active = true;
-    fetchCake(slug).then((c) => {
+    const load = preview
+      ? fetchCakeForAdmin(slug).then((c) =>
+          c ? { ...c, finalMessage: null, messages: c.messages.map((m) => ({ ...m, read: false })) } : c
+        )
+      : fetchCake(slug);
+    load.then((c) => {
       if (!active) return;
       setCake(c);
       // If every message was already read in a previous visit, the final
@@ -212,7 +220,7 @@ export function CakePage() {
     );
   }
 
-  if (isFuture(cake.unlockAt)) {
+  if (!preview && isFuture(cake.unlockAt)) {
     return (
       <CountdownLock
         unlockAt={cake.unlockAt as string}
@@ -254,7 +262,7 @@ export function CakePage() {
       setFinalRead(true);
     } else {
       setCake((prev) => (prev ? { ...prev, messages: prev.messages.map((m) => (m.id === id ? { ...m, read: true } : m)) } : prev));
-      await markMessageRead(slug, id);
+      if (!preview) await markMessageRead(slug, id);
     }
     sound.play('extinguish');
     setSelectedId(null);
@@ -265,7 +273,7 @@ export function CakePage() {
   // the messages themselves are never deleted or changed.
   async function handleReadAgain() {
     const ids = currentCake.messages.map((m) => m.id);
-    await resetReadState(slug, ids);
+    if (!preview) await resetReadState(slug, ids);
     setFinalUnlocked(false);
     setFinalRead(false);
     setRevealPhase(null);
@@ -277,6 +285,14 @@ export function CakePage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-espresso">
+      {preview && (
+        <div className="relative z-20 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-flame px-4 py-2 text-center text-xs text-onaccent">
+          <span>Preview: this is what {cake.recipientName} will see. Nothing here is saved.</span>
+          <Link to="/admin" className="font-medium underline underline-offset-2">
+            Back to admin
+          </Link>
+        </div>
+      )}
       <Grain reducedMotion={reducedMotion} />
       <FinalRevealOverlay phase={revealPhase} reducedMotion={reducedMotion} />
 

@@ -391,8 +391,11 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
       <div className="flex flex-wrap items-center gap-3">
         <LinkChip label={copied === 'share' ? 'Copied!' : 'Copy submit link'} onClick={() => copy(shareUrl, 'share')} />
         <LinkChip label={copied === 'view' ? 'Copied!' : 'Copy cake link'} onClick={() => copy(viewUrl, 'view')} />
-        <Link to={`/cake/${cake.slug}`} className="text-xs text-gold-light underline underline-offset-4">
-          Preview cake
+        <Link to={`/admin/preview/${cake.slug}`} className="text-xs text-gold-light underline underline-offset-4">
+          Preview as she&rsquo;ll see it
+        </Link>
+        <Link to={`/cake/${cake.slug}`} className="text-xs text-muted underline underline-offset-4 hover:text-ink">
+          Open public link
         </Link>
       </div>
 

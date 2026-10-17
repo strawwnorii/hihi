@@ -3,6 +3,7 @@ import { Home } from './pages/Home';
 import { CakePage } from './pages/CakePage';
 import { SubmitPage } from './pages/SubmitPage';
 import { AdminPage } from './pages/AdminPage';
+import { AdminPreview } from './pages/AdminPreview';
 import { NotFound } from './pages/NotFound';
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
       <Route path="/cake/:slug" element={<CakePage />} />
       <Route path="/submit/:slug" element={<SubmitPage />} />
       <Route path="/admin" element={<AdminPage />} />
+      <Route path="/admin/preview/:slug" element={<AdminPreview />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
