@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import { MOCK_CAKES, MOCK_PASSWORDS } from '../data/mockCakes';
-import type { BirthdayCake, CandleDesign } from '../types';
+import { DEFAULT_THEME } from './themes';
+import type { BirthdayCake, CakeTheme, CandleDesign } from '../types';
 
 export interface NewCakeInput {
   slug: string;
@@ -9,6 +10,8 @@ export interface NewCakeInput {
   finalSender: string;
   finalMessage: string;
   finalCandle: CandleDesign;
+  theme: CakeTheme;
+  unlockAt: string | null;
 }
 
 export async function createCake(input: NewCakeInput): Promise<{ ok: boolean; error?: string }> {
@@ -18,6 +21,8 @@ export async function createCake(input: NewCakeInput): Promise<{ ok: boolean; er
       slug: input.slug,
       recipientName: input.recipientName,
       cakeTitle: input.cakeTitle,
+      theme: input.theme,
+      unlockAt: input.unlockAt,
       finalMessage: {
         sender: input.finalSender,
         message: input.finalMessage,
@@ -38,8 +43,31 @@ export async function createCake(input: NewCakeInput): Promise<{ ok: boolean; er
     final_sender: input.finalSender,
     final_message: input.finalMessage,
     final_candle: input.finalCandle,
+    theme: input.theme,
+    unlock_at: input.unlockAt,
     owner_id: session.user.id,
   });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+// Change a cake's theme and/or unlock time after it was created. Owner-only
+// in Supabase mode (the "owners manage their own cakes" RLS policy).
+export async function updateCakeSettings(
+  slug: string,
+  updates: { theme?: CakeTheme; unlockAt?: string | null }
+): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    const cake = MOCK_CAKES[slug];
+    if (!cake) return { ok: false, error: 'That cake does not exist.' };
+    if (updates.theme !== undefined) cake.theme = updates.theme;
+    if (updates.unlockAt !== undefined) cake.unlockAt = updates.unlockAt;
+    return { ok: true };
+  }
+  const patch: Record<string, unknown> = {};
+  if (updates.theme !== undefined) patch.theme = updates.theme;
+  if (updates.unlockAt !== undefined) patch.unlock_at = updates.unlockAt;
+  const { error } = await supabase!.from('cakes').update(patch).eq('slug', slug);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
@@ -75,11 +103,13 @@ export async function listMyCakes(): Promise<BirthdayCake[]> {
   }
   const { data } = await supabase!
     .from('cakes')
-    .select('slug, recipient_name, cake_title, final_sender, final_message, final_candle');
+    .select('slug, recipient_name, cake_title, theme, unlock_at, final_sender, final_message, final_candle');
   return (data ?? []).map((row) => ({
     slug: row.slug,
     recipientName: row.recipient_name,
     cakeTitle: row.cake_title,
+    theme: (row.theme as CakeTheme) ?? DEFAULT_THEME,
+    unlockAt: row.unlock_at as string | null,
     finalMessage: {
       sender: row.final_sender,
       message: row.final_message,

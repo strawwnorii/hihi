@@ -4,6 +4,58 @@
 
 :root {
   color-scheme: dark;
+
+  /* Plum (default). Space-separated RGB so Tailwind opacity modifiers work. */
+  --c-espresso: 76 43 77;          /* #4C2B4D */
+  --c-espresso-light: 94 58 96;
+  --c-espresso-dark: 55 30 56;
+  --c-buttercream: 246 237 224;
+  --c-buttercream-dark: 228 211 189;
+  --c-buttercream-darker: 211 190 158;
+  --c-flame: 255 180 84;
+  --c-flame-hot: 255 218 158;
+  --c-flame-ember: 232 130 61;
+  --c-gold: 201 166 107;
+  --c-gold-light: 227 200 146;
+  --c-ink: 243 234 217;
+  --c-muted: 205 187 203;
+}
+
+/* The original warm dark brown. */
+[data-theme='espresso'] {
+  --c-espresso: 28 22 19;
+  --c-espresso-light: 42 33 28;
+  --c-espresso-dark: 18 13 11;
+  --c-muted: 183 169 150;
+}
+
+/* Light and soft. Flame and cake colors stay the same; only the ambient
+   background, text and accent shift. */
+[data-theme='blush'] {
+  color-scheme: light;
+  --c-espresso: 250 238 235;
+  --c-espresso-light: 255 247 244;
+  --c-espresso-dark: 240 221 216;
+  --c-ink: 72 50 50;
+  --c-muted: 150 112 112;
+  --c-gold: 190 108 120;
+  --c-gold-light: 170 85 98;
+}
+
+/* Deep and cool. */
+[data-theme='midnight'] {
+  --c-espresso: 12 16 25;
+  --c-espresso-light: 20 27 41;
+  --c-espresso-dark: 7 10 16;
+  --c-ink: 226 232 245;
+  --c-muted: 138 150 176;
+  --c-gold: 140 170 214;
+  --c-gold-light: 176 200 232;
+}
+
+/* Keep the page itself on the theme background, e.g. on overscroll. */
+body {
+  background-color: rgb(var(--c-espresso));
 }
 
 * {

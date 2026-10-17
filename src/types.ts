@@ -5,6 +5,7 @@ export type CandleColorName = 'white' | 'cream' | 'blue' | 'pink' | 'yellow' | '
 export type CandlePattern = 'plain' | 'stripes' | 'dots' | 'glitter';
 // 'firework', 'rainbow' and 'confetti' are exclusive — same reasoning as above.
 export type FlameStyle = 'normal' | 'small' | 'sparkle' | 'steady' | 'firework' | 'rainbow' | 'confetti';
+export type CakeTheme = 'plum' | 'espresso' | 'blush' | 'midnight';
 
 export const CANDLE_COLORS: Record<CandleColorName, string> = {
   white: '#F7F4EE',
@@ -51,6 +52,19 @@ export interface BirthdayCake {
   // null until fetchFinalMessage() has actually been called — kept out of
   // the initial fetch so it never reaches the browser before it's unlocked.
   finalMessage: FinalMessage | null;
+  theme: CakeTheme;
+  // ISO timestamp. null/undefined = viewable as soon as the password is
+  // correct. Friends can always submit early; this only gates the recipient.
+  unlockAt?: string | null;
+}
+
+// Safe to show before the password/unlock gate: a teaser, never any content.
+export interface CakeSummary {
+  recipientName: string;
+  cakeTitle: string;
+  theme: CakeTheme;
+  unlockAt?: string | null;
+  messageCount: number;
 }
 
 export const DEFAULT_CANDLE_DESIGN: CandleDesign = {

@@ -19,7 +19,7 @@ create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   cake_id uuid references cakes(id) on delete cascade not null,
   sender text not null check (char_length(sender) between 1 and 40),
-  message text not null check (char_length(message) between 1 and 500),
+  message text not null check (char_length(message) between 1 and 2000),
   candle jsonb not null,
   created_at timestamptz not null default now()
 );
@@ -129,3 +129,12 @@ end;
 $$;
 revoke all on function verify_cake_password(text, text) from public;
 grant execute on function verify_cake_password(text, text) to anon, authenticated;
+
+-- THEME + UNLOCK COUNTDOWN
+-- theme: purely cosmetic, safe to expose before the password gate.
+-- unlock_at: optional. NULL = viewable as soon as the password is correct.
+-- When set, the recipient sees a countdown until that moment. Friends can
+-- still submit early; this only gates the recipient's own view.
+alter table cakes add column if not exists theme text not null default 'plum'
+  check (theme in ('plum', 'espresso', 'blush', 'midnight'));
+alter table cakes add column if not exists unlock_at timestamptz;

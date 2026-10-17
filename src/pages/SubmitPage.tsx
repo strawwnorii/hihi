@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import { CandleCreatorForm } from '../components/CandleCreatorForm';
 import { Candle } from '../components/Candle';
 import { validateSubmission, sanitizeText, MAX_MESSAGE_LENGTH, MAX_NAME_LENGTH } from '../lib/sanitize';
-import { submitMessage } from '../lib/cakeStore';
+import { fetchCakeSummary, submitMessage } from '../lib/cakeStore';
+import { useApplyTheme } from '../hooks/useApplyTheme';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
-import type { CandleDesign } from '../types';
+import type { CakeTheme, CandleDesign } from '../types';
 
 export function SubmitPage() {
   const { slug = '' } = useParams();
@@ -14,6 +15,18 @@ export function SubmitPage() {
   const [design, setDesign] = useState<CandleDesign>(DEFAULT_CANDLE_DESIGN);
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CakeTheme | undefined>(undefined);
+  useApplyTheme(theme);
+
+  useEffect(() => {
+    let active = true;
+    fetchCakeSummary(slug).then((c) => {
+      if (active && c) setTheme(c.theme);
+    });
+    return () => {
+      active = false;
+    };
+  }, [slug]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -104,7 +117,7 @@ export function SubmitPage() {
           <button
             type="submit"
             disabled={status === 'sending'}
-            className="self-start rounded-sm bg-flame/90 px-5 py-2.5 text-sm font-medium text-espresso-dark transition-colors hover:bg-flame disabled:opacity-60"
+            className="self-start rounded-sm bg-flame/90 px-5 py-2.5 text-sm font-medium text-onaccent transition-colors hover:bg-flame disabled:opacity-60"
           >
             {status === 'sending' ? 'Lighting your candle…' : 'Light this candle'}
           </button>

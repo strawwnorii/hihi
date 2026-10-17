@@ -5,6 +5,7 @@ import { MessageModal } from '../components/MessageModal';
 import { ProgressBar } from '../components/ProgressBar';
 import { SoundToggle } from '../components/SoundToggle';
 import { FinalRevealOverlay } from '../components/FinalRevealOverlay';
+import { CountdownLock } from '../components/CountdownLock';
 import {
   fetchCake,
   fetchCakeSummary,
@@ -16,8 +17,9 @@ import {
 } from '../lib/cakeStore';
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion';
 import { useSound } from '../hooks/useSound';
+import { useApplyTheme } from '../hooks/useApplyTheme';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
-import type { BirthdayCake } from '../types';
+import type { BirthdayCake, CakeSummary } from '../types';
 
 type RevealPhase = 'celebrating' | 'announcing' | null;
 
@@ -25,10 +27,21 @@ function unlockKey(slug: string) {
   return `cake_unlocked_${slug}`;
 }
 
+function isFuture(iso: string | null | undefined): boolean {
+  return !!iso && new Date(iso).getTime() > Date.now();
+}
+
+function candleTeaser(count: number): string {
+  if (count === 0) return 'No candles yet. Be the first to leave one.';
+  if (count === 1) return '1 candle is waiting for you.';
+  return `${count} candles are waiting for you.`;
+}
+
 export function CakePage() {
   const { slug = '' } = useParams();
   const [unlocked, setUnlocked] = useState(() => localStorage.getItem(unlockKey(slug)) === '1');
-  const [summary, setSummary] = useState<{ recipientName: string; cakeTitle: string } | null | undefined>(undefined);
+  const [summary, setSummary] = useState<CakeSummary | null | undefined>(undefined);
+  const [, setClockTick] = useState(0); // forces a re-render when a countdown ends
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [checkingPassword, setCheckingPassword] = useState(false);
@@ -41,6 +54,9 @@ export function CakePage() {
   const reducedMotion = usePrefersReducedMotion();
   const sound = useSound();
   const hasCheckedInitialState = useRef(false);
+
+  // Theme applies to the whole page (background included).
+  useApplyTheme(cake?.theme ?? summary?.theme);
 
   // Before we know whether this visitor has the password, only fetch
   // enough to show a title on the gate screen — never the messages.
@@ -132,15 +148,27 @@ export function CakePage() {
         </CenteredNote>
       );
     }
+    if (isFuture(summary.unlockAt)) {
+      return (
+        <CountdownLock
+          unlockAt={summary.unlockAt as string}
+          cakeTitle={summary.cakeTitle}
+          recipientName={summary.recipientName}
+          messageCount={summary.messageCount}
+          onUnlocked={() => setClockTick((n) => n + 1)}
+        />
+      );
+    }
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-espresso px-6 text-center">
         <p className="text-xs tracking-[0.15em] text-muted">{summary.cakeTitle}</p>
         <h1 className="max-w-md font-display text-3xl italic text-ink sm:text-4xl">
           A cake for {summary.recipientName}
         </h1>
+        <p className="text-sm text-gold-light">{candleTeaser(summary.messageCount)}</p>
         <Link
           to={`/submit/${slug}`}
-          className="rounded-sm bg-flame/90 px-5 py-2.5 text-sm font-medium text-espresso-dark hover:bg-flame"
+          className="rounded-sm bg-flame/90 px-5 py-2.5 text-sm font-medium text-onaccent hover:bg-flame"
         >
           Send a message
         </Link>
@@ -181,6 +209,18 @@ export function CakePage() {
           Go home
         </Link>
       </CenteredNote>
+    );
+  }
+
+  if (isFuture(cake.unlockAt)) {
+    return (
+      <CountdownLock
+        unlockAt={cake.unlockAt as string}
+        cakeTitle={cake.cakeTitle}
+        recipientName={cake.recipientName}
+        messageCount={cake.messages.length}
+        onUnlocked={() => setClockTick((n) => n + 1)}
+      />
     );
   }
 

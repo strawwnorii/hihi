@@ -5,6 +5,8 @@ export const MOCK_CAKES: Record<string, BirthdayCake> = {
     slug: 'maria',
     recipientName: 'Maria',
     cakeTitle: 'Happy Birthday, Maria',
+    theme: 'plum',
+    unlockAt: null,
     finalMessage: {
       sender: 'Josh',
       message:

@@ -4,27 +4,32 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Resolved from CSS variables set per theme in index.css via a
+        // data-theme attribute, so class names (bg-espresso, text-ink/80...)
+        // never change between themes - only what they point to does.
         espresso: {
-          DEFAULT: '#1C1613',
-          light: '#2A211C',
-          dark: '#120D0B',
+          DEFAULT: 'rgb(var(--c-espresso) / <alpha-value>)',
+          light: 'rgb(var(--c-espresso-light) / <alpha-value>)',
+          dark: 'rgb(var(--c-espresso-dark) / <alpha-value>)',
         },
         buttercream: {
-          DEFAULT: '#F6EDE0',
-          dark: '#E4D3BD',
-          darker: '#D3BE9E',
+          DEFAULT: 'rgb(var(--c-buttercream) / <alpha-value>)',
+          dark: 'rgb(var(--c-buttercream-dark) / <alpha-value>)',
+          darker: 'rgb(var(--c-buttercream-darker) / <alpha-value>)',
         },
         flame: {
-          DEFAULT: '#FFB454',
-          hot: '#FFDA9E',
-          ember: '#E8823D',
+          DEFAULT: 'rgb(var(--c-flame) / <alpha-value>)',
+          hot: 'rgb(var(--c-flame-hot) / <alpha-value>)',
+          ember: 'rgb(var(--c-flame-ember) / <alpha-value>)',
         },
         gold: {
-          DEFAULT: '#C9A66B',
-          light: '#E3C892',
+          DEFAULT: 'rgb(var(--c-gold) / <alpha-value>)',
+          light: 'rgb(var(--c-gold-light) / <alpha-value>)',
         },
-        ink: '#F3EAD9',
-        muted: '#B7A996',
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        muted: 'rgb(var(--c-muted) / <alpha-value>)',
+        // Fixed (not themed): dark text for buttons on the amber flame color.
+        onaccent: '#1C1613',
       },
       fontFamily: {
         display: ['"Fraunces"', 'ui-serif', 'Georgia', 'serif'],

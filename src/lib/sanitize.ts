@@ -3,7 +3,7 @@
 // (supabase/schema.sql) plus re-validating on write — never trust the client.
 
 export const MAX_NAME_LENGTH = 40;
-export const MAX_MESSAGE_LENGTH = 500;
+export const MAX_MESSAGE_LENGTH = 2000;
 
 export function stripTags(value: string): string {
   return value.replace(/<[^>]*>/g, '');

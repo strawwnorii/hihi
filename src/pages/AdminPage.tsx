@@ -1,11 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { createCake, deleteCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword } from '../lib/adminStore';
-import { fetchCake } from '../lib/cakeStore';
+import { createCake, deleteCake, deleteMessage, listMyCakes, sendAdminMagicLink, setCakePassword, updateCakeSettings } from '../lib/adminStore';
+import { fetchCakeForAdmin } from '../lib/cakeStore';
+import { DEFAULT_THEME, THEME_OPTIONS } from '../lib/themes';
+import { MessageModal } from '../components/MessageModal';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { CandleCreatorForm } from '../components/CandleCreatorForm';
 import { DEFAULT_CANDLE_DESIGN } from '../types';
-import type { BirthdayCake, CandleDesign } from '../types';
+import type { BirthdayCake, CakeTheme, CandleDesign, CandleMessage } from '../types';
 
 // Optional: restrict /admin to a single email address. Leave VITE_ADMIN_EMAIL
 // unset in .env.local to allow any email to sign up as a creator.
@@ -99,7 +101,7 @@ export function AdminPage() {
               <button
                 type="submit"
                 disabled={sending}
-                className="rounded-sm bg-flame/90 px-4 py-2.5 text-sm font-medium text-espresso-dark hover:bg-flame disabled:opacity-50"
+                className="rounded-sm bg-flame/90 px-4 py-2.5 text-sm font-medium text-onaccent hover:bg-flame disabled:opacity-50"
               >
                 {sending ? 'Sending…' : 'Send sign-in link'}
               </button>
@@ -136,7 +138,7 @@ function AdminDashboard() {
     }
     let active = true;
     setLoadingDetail(true);
-    fetchCake(selectedSlug).then((d) => {
+    fetchCakeForAdmin(selectedSlug).then((d) => {
       if (!active) return;
       setDetail(d);
       setLoadingDetail(false);
@@ -204,7 +206,7 @@ function AdminDashboard() {
         {selectedSlug && loadingDetail && !detail && (
           <p className="mt-10 text-sm text-muted">Loading cake…</p>
         )}
-        {detail && selectedSlug && <CakeDetail cake={detail} onChanged={() => fetchCake(selectedSlug).then(setDetail)} />}
+        {detail && selectedSlug && <CakeDetail cake={detail} onChanged={() => fetchCakeForAdmin(selectedSlug).then(setDetail)} />}
       </div>
     </div>
   );
@@ -217,6 +219,8 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
   const [finalSender, setFinalSender] = useState('');
   const [finalMessage, setFinalMessage] = useState('');
   const [viewPassword, setViewPassword] = useState('');
+  const [theme, setTheme] = useState<CakeTheme>(DEFAULT_THEME);
+  const [unlockLocal, setUnlockLocal] = useState('');
   const [candleDesign, setCandleDesign] = useState<CandleDesign>({ ...DEFAULT_CANDLE_DESIGN, flame: 'firework' });
   const [error, setError] = useState<string | null>(null);
 
@@ -241,6 +245,8 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
           finalSender: finalSender || 'You',
           finalMessage,
           finalCandle: candleDesign,
+          theme,
+          unlockAt: unlockLocal ? new Date(unlockLocal).toISOString() : null,
         });
         if (!res.ok) {
           setError(res.error ?? 'Could not create the cake.');
@@ -285,8 +291,10 @@ function NewCakeForm({ onCreated }: { onCreated: () => void }) {
         </span>
         <CandleCreatorForm design={candleDesign} onChange={setCandleDesign} exclusiveFlames exclusiveColors />
       </div>
+      <ThemePicker value={theme} onChange={setTheme} />
+      <UnlockField value={unlockLocal} onChange={setUnlockLocal} />
       {error && <p className="text-sm text-flame">{error}</p>}
-      <button type="submit" className="self-start rounded-sm bg-flame/90 px-4 py-2 text-sm font-medium text-espresso-dark hover:bg-flame">
+      <button type="submit" className="self-start rounded-sm bg-flame/90 px-4 py-2 text-sm font-medium text-onaccent hover:bg-flame">
         Create cake
       </button>
     </form>
@@ -324,6 +332,38 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
   const [newPassword, setNewPassword] = useState('');
   const [pwStatus, setPwStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [pwError, setPwError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<CakeTheme>(cake.theme);
+  const [unlockLocal, setUnlockLocal] = useState(toLocalInput(cake.unlockAt));
+  const [settingsStatus, setSettingsStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  // "Read again": view any message (or the final one) without needing the
+  // recipient's password and without marking anything read.
+  const [preview, setPreview] = useState<{ message: CandleMessage; isFinal: boolean } | null>(null);
+
+  async function saveSettings(e: FormEvent) {
+    e.preventDefault();
+    setSettingsStatus('saving');
+    setSettingsError(null);
+    const res = await updateCakeSettings(cake.slug, {
+      theme,
+      unlockAt: unlockLocal ? new Date(unlockLocal).toISOString() : null,
+    });
+    if (!res.ok) {
+      setSettingsStatus('error');
+      setSettingsError(res.error ?? 'Could not save.');
+      return;
+    }
+    setSettingsStatus('saved');
+    setTimeout(() => setSettingsStatus('idle'), 1500);
+  }
+
+  function openFinalPreview() {
+    if (!cake.finalMessage) return;
+    setPreview({
+      isFinal: true,
+      message: { id: 'final', sender: cake.finalMessage.sender, message: cake.finalMessage.message, candle: cake.finalMessage.candle, read: false, createdAt: '' },
+    });
+  }
 
   function copy(url: string, which: 'share' | 'view') {
     navigator.clipboard.writeText(url);
@@ -394,9 +434,33 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
         {pwError && <p className="w-full text-sm text-flame">{pwError}</p>}
       </form>
 
-      <p className="mt-6 text-xs tracking-wide text-muted">
-        {cake.messages.filter((m) => m.read).length} of {cake.messages.length} read
-      </p>
+      <form onSubmit={saveSettings} className="mt-4 flex flex-col gap-4 rounded-sm border border-white/10 bg-espresso-light p-4">
+        <ThemePicker value={theme} onChange={setTheme} />
+        <UnlockField value={unlockLocal} onChange={setUnlockLocal} />
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={settingsStatus === 'saving'}
+            className="rounded-sm border border-white/15 px-3 py-2.5 text-xs hover:border-white/30 disabled:opacity-50"
+          >
+            {settingsStatus === 'saving' ? 'Saving…' : settingsStatus === 'saved' ? 'Saved!' : 'Save theme & unlock time'}
+          </button>
+          {settingsError && <p className="text-sm text-flame">{settingsError}</p>}
+        </div>
+      </form>
+
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-xs tracking-wide text-muted">
+          {cake.messages.filter((m) => m.read).length} of {cake.messages.length} read
+        </p>
+        <button
+          type="button"
+          onClick={openFinalPreview}
+          className="text-xs text-gold-light underline underline-offset-4 hover:text-ink"
+        >
+          Read your final message
+        </button>
+      </div>
 
       <ul className="mt-3 flex flex-col divide-y divide-white/10">
         {cake.messages.map((m) => (
@@ -408,23 +472,100 @@ function CakeDetail({ cake, onChanged }: { cake: BirthdayCake; onChanged: () => 
               </p>
               <p className="mt-1 max-w-md text-sm text-ink/80">{m.message}</p>
             </div>
-            <button
-              type="button"
-              onClick={async () => {
-                await deleteMessage(m.id);
-                onChanged();
-              }}
-              className="shrink-0 text-xs text-muted hover:text-flame"
-            >
-              Delete
-            </button>
+            <div className="flex shrink-0 items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPreview({ message: m, isFinal: false })}
+                className="text-xs text-gold-light hover:text-ink"
+              >
+                Read
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await deleteMessage(m.id);
+                  onChanged();
+                }}
+                className="text-xs text-muted hover:text-flame"
+              >
+                Delete
+              </button>
+            </div>
           </li>
         ))}
         {cake.messages.length === 0 && (
           <li className="py-3 text-sm text-muted">No messages yet.</li>
         )}
       </ul>
+
+      <MessageModal
+        message={preview?.message ?? null}
+        isFinal={preview?.isFinal}
+        previewOnly
+        onFinish={() => {}}
+        onClose={() => setPreview(null)}
+        reducedMotion={false}
+      />
     </div>
+  );
+}
+
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function ThemePicker({ value, onChange }: { value: CakeTheme; onChange: (t: CakeTheme) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <span className="text-xs tracking-wide text-muted">Cake theme</span>
+      <div className="flex flex-wrap gap-2">
+        {THEME_OPTIONS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => onChange(t.value)}
+            aria-pressed={value === t.value}
+            title={t.blurb}
+            className={[
+              'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors',
+              value === t.value ? 'border-gold bg-gold/15 text-gold-light' : 'border-white/15 text-ink/80 hover:border-white/30',
+            ].join(' ')}
+          >
+            <span
+              className="h-4 w-4 rounded-full border border-white/30"
+              style={{ background: `linear-gradient(135deg, ${t.swatch.bg} 55%, ${t.swatch.accent} 55%)` }}
+            />
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function UnlockField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex flex-col gap-2">
+      <span className="text-xs tracking-wide text-muted">
+        Unlock time <span className="text-muted/70">(optional. Friends can submit early, but she can&rsquo;t open the cake until then)</span>
+      </span>
+      <div className="flex items-center gap-3">
+        <input
+          type="datetime-local"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="rounded-sm border border-white/15 bg-espresso px-3 py-2.5 text-ink"
+        />
+        {value && (
+          <button type="button" onClick={() => onChange('')} className="text-xs text-muted underline underline-offset-4 hover:text-ink">
+            Clear
+          </button>
+        )}
+      </div>
+    </label>
   );
 }
 
